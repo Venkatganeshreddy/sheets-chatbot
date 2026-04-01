@@ -41,11 +41,9 @@ def get_sheet_id(url):
 def get_gc():
     # Check if running on Streamlit Cloud (secrets available)
     if "gcp_service_account" in st.secrets:
-        gcp_info = dict(st.secrets["gcp_service_account"])
-        # Fix private key: TOML triple-quoted strings may lose \n formatting
-        pk = gcp_info.get("private_key", "")
-        if "\\n" in pk:
-            gcp_info["private_key"] = pk.replace("\\n", "\n")
+        gcp_raw = st.secrets["gcp_service_account"]
+        # Convert AttrDict to a plain dict recursively
+        gcp_info = json.loads(json.dumps(dict(gcp_raw)))
         creds = Credentials.from_service_account_info(gcp_info, scopes=SCOPES)
         return gspread.authorize(creds)
     # Local dev: use credentials file
