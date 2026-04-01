@@ -418,7 +418,7 @@ RELEVANT SPREADSHEET DATA:
 
 # --- Custom CSS ---
 
-st.set_page_config(page_title="AOL Chatbot", page_icon="https://www.nxtwave.co.in/favicon.ico", layout="wide")
+st.set_page_config(page_title="AOL Chatbot", page_icon="🎓", layout="wide")
 
 st.markdown("""
 <style>
@@ -432,6 +432,18 @@ st.markdown("""
         font-family: 'Inter', 'Segoe UI', sans-serif;
     }
 
+    /* Remove Streamlit element borders/outlines */
+    .stElementContainer, .element-container {
+        outline: none !important;
+        border: none !important;
+    }
+    [data-testid="stMarkdownContainer"] > div {
+        outline: none !important;
+    }
+    .stAlert {
+        border-left: none !important;
+    }
+
     /* Top header bar */
     .aol-header {
         background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
@@ -441,6 +453,8 @@ st.markdown("""
         display: flex;
         align-items: center;
         justify-content: space-between;
+        border: none !important;
+        outline: none !important;
     }
     .aol-header h1 {
         color: #ffffff;
@@ -595,12 +609,15 @@ with st.sidebar:
 
     st.markdown("## Main Sheets")
     for c in main_chunks:
-        st.caption(f"{c['label']}")
+        # Show only tab name (after ">")
+        name = c["label"].split(">")[-1].strip() if ">" in c["label"] else c["label"]
+        st.caption(f"{name}")
 
     st.markdown("## Linked Sheets")
     with st.expander(f"View all ({len(linked_chunks)})"):
         for c in linked_chunks:
-            st.caption(f"{c['label'][:55]}")
+            name = c["label"].split(">")[-1].strip() if ">" in c["label"] else c["label"]
+            st.caption(f"{name[:50]}")
 
     st.divider()
     st.caption("Data cached 5 min. Click Refresh for latest.")
@@ -613,7 +630,7 @@ if "messages" not in st.session_state:
 
 # Welcome message
 if not st.session_state.messages:
-    with st.chat_message("assistant", avatar="https://www.nxtwave.co.in/favicon.ico"):
+    with st.chat_message("assistant", avatar="🎓"):
         st.markdown("""**Welcome to AOL Chatbot!** I have access to all your NIAT 2025 data including:
 
 - BOS Tracker (Sem 1-4) — university statuses, frameworks, accreditation
@@ -637,7 +654,7 @@ if prompt := st.chat_input("Ask about universities, BOS status, curricula, imple
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    with st.chat_message("assistant", avatar="https://www.nxtwave.co.in/favicon.ico"):
+    with st.chat_message("assistant", avatar="🎓"):
         with st.spinner("Searching across all sheets..."):
             relevant = retrieve_relevant_chunks(prompt, chunks, vectorizer, tfidf_matrix)
 
