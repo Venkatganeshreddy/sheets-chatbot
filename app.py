@@ -427,242 +427,279 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
     footer {visibility: hidden;}
     .stDeployButton {display: none;}
 
     html, body, [class*="css"] {
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
+        font-family: 'Space Grotesk', -apple-system, sans-serif !important;
     }
 
-    /* ── Page background ── */
-    .stApp {
-        background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+    .stApp { background: #0a0a0f; }
+
+    /* ── Animated mesh background ── */
+    .mesh-bg {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        pointer-events: none; z-index: 0;
+        background:
+            radial-gradient(ellipse 600px 400px at 20% 20%, rgba(99,102,241,0.08) 0%, transparent 70%),
+            radial-gradient(ellipse 500px 500px at 80% 80%, rgba(236,72,153,0.06) 0%, transparent 70%),
+            radial-gradient(ellipse 400px 300px at 60% 30%, rgba(34,197,94,0.05) 0%, transparent 70%);
     }
 
-    /* ── Hero header ── */
-    .hero {
-        background: linear-gradient(135deg, #0f172a 0%, #1e293b 40%, #334155 100%);
-        padding: 2rem 2.5rem;
-        border-radius: 20px;
-        margin-bottom: 1.5rem;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
+    /* ── Hero ── */
+    .hero2 {
         position: relative;
+        background: linear-gradient(135deg, rgba(15,23,42,0.9), rgba(30,41,59,0.9));
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(255,255,255,0.06);
+        padding: 2.2rem 2.8rem;
+        border-radius: 24px;
+        margin-bottom: 1.5rem;
+        display: flex; align-items: center; justify-content: space-between;
         overflow: hidden;
     }
-    .hero::before {
-        content: '';
-        position: absolute;
-        top: -50%; right: -20%;
-        width: 400px; height: 400px;
-        background: radial-gradient(circle, rgba(99,102,241,0.15) 0%, transparent 70%);
-        border-radius: 50%;
+    .hero2::before {
+        content: ''; position: absolute; inset: 0;
+        background: linear-gradient(135deg, rgba(99,102,241,0.1) 0%, transparent 50%, rgba(236,72,153,0.08) 100%);
+        border-radius: 24px;
     }
-    .hero::after {
-        content: '';
-        position: absolute;
-        bottom: -60%; left: 10%;
-        width: 300px; height: 300px;
-        background: radial-gradient(circle, rgba(34,197,94,0.1) 0%, transparent 70%);
-        border-radius: 50%;
+    .hero2-left { position: relative; z-index: 1; }
+    .hero2-tag {
+        display: inline-block;
+        background: linear-gradient(135deg, #6366f1, #ec4899);
+        padding: 4px 12px; border-radius: 6px;
+        font-size: 0.6rem; font-weight: 600; letter-spacing: 2.5px;
+        color: white; text-transform: uppercase; margin-bottom: 10px;
     }
-    .hero-text { position: relative; z-index: 1; }
-    .hero-brand {
-        font-size: 0.7rem; font-weight: 600; letter-spacing: 2px;
-        color: #6366f1; text-transform: uppercase; margin-bottom: 4px;
+    .hero2 h1 {
+        font-family: 'Space Grotesk', sans-serif;
+        color: #ffffff; font-size: 2.2rem; font-weight: 700;
+        margin: 0; line-height: 1.1; letter-spacing: -1px;
     }
-    .hero h1 {
-        color: #f8fafc; font-size: 1.75rem; font-weight: 800;
-        margin: 0; letter-spacing: -0.5px; line-height: 1.2;
+    .hero2 h1 span {
+        background: linear-gradient(135deg, #818cf8, #c084fc, #f472b6);
+        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
     }
-    .hero h1 em {
-        font-style: normal;
-        background: linear-gradient(135deg, #6366f1, #a78bfa);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
+    .hero2-sub {
+        color: #64748b; font-size: 0.88rem; margin: 10px 0 0 0;
+        font-weight: 400;
     }
-    .hero-sub {
-        color: #94a3b8; font-size: 0.85rem; margin: 6px 0 0 0;
-        font-weight: 400; letter-spacing: 0.2px;
+    .hero2-sub strong { color: #94a3b8; }
+    .hero2-right { position: relative; z-index: 1; text-align: right; }
+    .live2 {
+        display: inline-flex; align-items: center; gap: 8px;
+        background: rgba(34,197,94,0.1);
+        border: 1px solid rgba(34,197,94,0.25);
+        padding: 8px 18px; border-radius: 50px;
+        font-size: 0.72rem; font-weight: 600; color: #4ade80;
+        letter-spacing: 1.5px;
     }
-    .hero-right { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
-    .live-pill {
-        display: inline-flex; align-items: center; gap: 7px;
-        background: rgba(34,197,94,0.12); color: #4ade80;
-        padding: 7px 16px; border-radius: 24px;
-        font-size: 0.72rem; font-weight: 700; letter-spacing: 1px;
+    .live2-dot {
+        width: 8px; height: 8px; background: #4ade80; border-radius: 50%;
+        box-shadow: 0 0 12px #4ade80; animation: pulse2 2s infinite;
+    }
+    @keyframes pulse2 { 0%,100%{box-shadow:0 0 12px #4ade80;} 50%{box-shadow:0 0 2px #4ade80;} }
+    .hero2-meta {
+        margin-top: 8px; font-size: 0.65rem; color: #475569;
+        font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* ── Glowing stat cards ── */
+    .sg { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 1.5rem; }
+    .sc {
+        background: rgba(15,23,42,0.6);
         backdrop-filter: blur(10px);
-        border: 1px solid rgba(34,197,94,0.2);
-    }
-    .live-dot {
-        width: 8px; height: 8px; background: #4ade80;
-        border-radius: 50%; display: inline-block;
-        box-shadow: 0 0 8px rgba(74,222,128,0.6);
-        animation: glow 2s infinite;
-    }
-    @keyframes glow {
-        0%,100% { opacity:1; box-shadow: 0 0 8px rgba(74,222,128,0.6); }
-        50% { opacity:0.5; box-shadow: 0 0 2px rgba(74,222,128,0.2); }
-    }
-    .hero-version {
-        font-size: 0.65rem; color: #64748b; letter-spacing: 0.5px;
-    }
-
-    /* ── Stat cards ── */
-    .stats-grid {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 14px;
-        margin-bottom: 1.5rem;
-    }
-    .stat {
-        background: white;
-        border: 1px solid #e2e8f0;
-        border-radius: 16px;
-        padding: 20px 16px;
-        text-align: center;
-        position: relative;
+        border: 1px solid rgba(255,255,255,0.06);
+        border-radius: 18px; padding: 22px 16px;
+        text-align: center; position: relative;
+        transition: all 0.4s cubic-bezier(0.4,0,0.2,1);
         overflow: hidden;
-        transition: all 0.3s ease;
     }
-    .stat:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 25px rgba(0,0,0,0.06);
-        border-color: #cbd5e1;
+    .sc::before {
+        content: ''; position: absolute; inset: 0;
+        border-radius: 18px; opacity: 0;
+        transition: opacity 0.4s;
     }
-    .stat-icon {
-        font-size: 1.5rem;
-        margin-bottom: 6px;
+    .sc:nth-child(1)::before { background: linear-gradient(135deg, rgba(99,102,241,0.15), transparent); }
+    .sc:nth-child(2)::before { background: linear-gradient(135deg, rgba(236,72,153,0.15), transparent); }
+    .sc:nth-child(3)::before { background: linear-gradient(135deg, rgba(34,197,94,0.15), transparent); }
+    .sc:nth-child(4)::before { background: linear-gradient(135deg, rgba(251,191,36,0.15), transparent); }
+    .sc:hover::before { opacity: 1; }
+    .sc:hover { transform: translateY(-4px); border-color: rgba(255,255,255,0.12); }
+    .sc-icon { font-size: 1.8rem; margin-bottom: 8px; position: relative; z-index: 1; }
+    .sc-num {
+        font-family: 'Space Grotesk', sans-serif;
+        font-size: 2rem; font-weight: 700; color: #f1f5f9;
+        line-height: 1; margin-bottom: 4px; position: relative; z-index: 1;
     }
-    .stat-num {
-        font-size: 1.8rem; font-weight: 800; color: #0f172a;
-        line-height: 1; margin-bottom: 4px;
-    }
-    .stat-label {
-        font-size: 0.68rem; color: #94a3b8;
-        text-transform: uppercase; letter-spacing: 1px; font-weight: 600;
+    .sc-label {
+        font-size: 0.65rem; color: #64748b; text-transform: uppercase;
+        letter-spacing: 1.2px; font-weight: 500; position: relative; z-index: 1;
     }
 
-    /* ── Welcome card ── */
-    .welcome-card {
-        background: white;
-        border: 1px solid #e2e8f0;
-        border-radius: 16px;
-        padding: 1.5rem 2rem;
+    /* ── Welcome ── */
+    .wc {
+        background: rgba(15,23,42,0.5);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255,255,255,0.06);
+        border-radius: 20px; padding: 2rem 2.5rem;
         margin-bottom: 1rem;
     }
-    .welcome-card h3 {
-        color: #0f172a; font-size: 1.1rem; font-weight: 700; margin: 0 0 8px 0;
+    .wc h3 { color: #f1f5f9; font-size: 1.3rem; font-weight: 700; margin: 0 0 6px 0; }
+    .wc p { color: #94a3b8; font-size: 0.88rem; line-height: 1.7; margin: 0 0 16px 0; }
+    .wc-grid { display: flex; flex-wrap: wrap; gap: 10px; }
+    .wc-chip {
+        background: rgba(255,255,255,0.04);
+        border: 1px solid rgba(255,255,255,0.08);
+        color: #cbd5e1; padding: 10px 18px; border-radius: 12px;
+        font-size: 0.82rem; font-weight: 500;
+        transition: all 0.25s; cursor: default;
     }
-    .welcome-card p { color: #475569; font-size: 0.88rem; margin: 0 0 12px 0; line-height: 1.6; }
-    .example-chips {
-        display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px;
+    .wc-chip:hover {
+        background: rgba(99,102,241,0.12);
+        border-color: rgba(99,102,241,0.3);
+        color: #e0e7ff;
+        transform: translateY(-1px);
     }
-    .chip {
-        background: #f1f5f9; color: #334155;
-        padding: 8px 16px; border-radius: 24px;
-        font-size: 0.8rem; font-weight: 500;
-        border: 1px solid #e2e8f0;
-        cursor: default;
-        transition: all 0.2s;
-    }
-    .chip:hover { background: #e2e8f0; border-color: #cbd5e1; }
 
-    /* ── Chat styling ── */
-    .stChatMessage { border-radius: 16px !important; }
-    [data-testid="stChatInput"] > div {
+    /* ── Chat ── */
+    .stChatMessage {
         border-radius: 16px !important;
-        border: 2px solid #e2e8f0 !important;
-        transition: border-color 0.2s;
+        background: rgba(15,23,42,0.4) !important;
+        border: 1px solid rgba(255,255,255,0.04) !important;
+    }
+    .stChatMessage p, .stChatMessage li, .stChatMessage span {
+        color: #e2e8f0 !important;
+    }
+    .stChatMessage strong { color: #f8fafc !important; }
+    .stChatMessage a { color: #818cf8 !important; }
+    [data-testid="stChatInput"] > div {
+        background: rgba(15,23,42,0.6) !important;
+        border: 1px solid rgba(255,255,255,0.1) !important;
+        border-radius: 14px !important;
+        color: #f1f5f9 !important;
     }
     [data-testid="stChatInput"] > div:focus-within {
-        border-color: #6366f1 !important;
-        box-shadow: 0 0 0 3px rgba(99,102,241,0.1) !important;
+        border-color: rgba(99,102,241,0.5) !important;
+        box-shadow: 0 0 20px rgba(99,102,241,0.15) !important;
     }
+    [data-testid="stChatInput"] textarea {
+        color: #f1f5f9 !important;
+    }
+    [data-testid="stChatInput"] textarea::placeholder {
+        color: #475569 !important;
+    }
+
+    /* ── Expander in chat ── */
+    .streamlit-expanderHeader { color: #94a3b8 !important; font-size: 0.82rem !important; }
+    .streamlit-expanderContent p, .streamlit-expanderContent span { color: #94a3b8 !important; }
 
     /* ── Sidebar ── */
     section[data-testid="stSidebar"] {
-        background: #ffffff;
-        border-right: 1px solid #f1f5f9;
+        background: linear-gradient(180deg, #0f172a, #1e293b) !important;
+        border-right: 1px solid rgba(255,255,255,0.06);
     }
-    .sb-logo {
-        display: flex; align-items: center; gap: 10px;
-        padding: 4px 0 16px 0; border-bottom: 1px solid #f1f5f9;
-        margin-bottom: 16px;
-    }
-    .sb-logo-icon {
-        width: 36px; height: 36px; border-radius: 10px;
-        background: linear-gradient(135deg, #6366f1, #8b5cf6);
-        display: flex; align-items: center; justify-content: center;
-        font-size: 1.1rem; color: white;
-    }
-    .sb-logo-text { font-size: 0.95rem; font-weight: 700; color: #0f172a; }
-    .sb-logo-sub { font-size: 0.65rem; color: #94a3b8; }
+    section[data-testid="stSidebar"] * { color: #cbd5e1 !important; }
+    section[data-testid="stSidebar"] .stMarkdown p { color: #94a3b8 !important; }
+    section[data-testid="stSidebar"] .stCaption p { color: #64748b !important; }
 
-    .sb-section {
-        font-size: 0.65rem; font-weight: 700; color: #94a3b8;
-        text-transform: uppercase; letter-spacing: 1.5px;
-        margin: 20px 0 8px 0;
+    .sb2-brand {
+        display: flex; align-items: center; gap: 12px;
+        padding-bottom: 20px; margin-bottom: 16px;
+        border-bottom: 1px solid rgba(255,255,255,0.06);
     }
-    .sb-item {
-        font-size: 0.8rem; color: #475569; padding: 5px 10px;
-        border-radius: 8px; margin: 2px 0;
-        transition: background 0.15s;
+    .sb2-icon {
+        width: 42px; height: 42px; border-radius: 14px;
+        background: linear-gradient(135deg, #6366f1, #ec4899);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.2rem; flex-shrink: 0;
     }
-    .sb-item:hover { background: #f8fafc; }
-    .sb-status {
-        display: flex; align-items: center; gap: 8px;
-        background: #f0fdf4; border: 1px solid #bbf7d0;
-        border-radius: 10px; padding: 10px 14px;
-        font-size: 0.8rem; color: #166534; font-weight: 500;
+    .sb2-name { font-size: 1rem; font-weight: 700; color: #f1f5f9 !important; line-height: 1.2; }
+    .sb2-sub { font-size: 0.7rem; color: #64748b !important; margin-top: 2px; }
+
+    .sb2-status {
+        background: rgba(34,197,94,0.1);
+        border: 1px solid rgba(34,197,94,0.2);
+        border-radius: 12px; padding: 12px 16px;
+        font-size: 0.8rem; color: #4ade80 !important;
+        font-weight: 500; margin: 12px 0;
     }
-    .sb-footer {
-        position: fixed; bottom: 12px;
-        font-size: 0.65rem; color: #cbd5e1;
-        text-align: center; width: 100%;
+    .sb2-section {
+        font-size: 0.6rem; font-weight: 700; color: #475569 !important;
+        text-transform: uppercase; letter-spacing: 2px;
+        margin: 20px 0 10px 0;
+    }
+    .sb2-item {
+        font-size: 0.78rem; color: #94a3b8 !important;
+        padding: 6px 12px; border-radius: 8px; margin: 2px 0;
+        transition: all 0.2s;
+    }
+    .sb2-item:hover {
+        background: rgba(255,255,255,0.04);
+        color: #e2e8f0 !important;
+    }
+
+    /* ── Status widget ── */
+    [data-testid="stStatusWidget"] { background: rgba(15,23,42,0.6) !important; border-radius: 14px !important; }
+    [data-testid="stStatusWidget"] p, [data-testid="stStatusWidget"] span { color: #94a3b8 !important; }
+
+    /* ── Spinner ── */
+    .stSpinner > div { color: #94a3b8 !important; }
+
+    /* ── Buttons in sidebar ── */
+    section[data-testid="stSidebar"] .stButton button {
+        background: linear-gradient(135deg, #6366f1, #8b5cf6) !important;
+        color: white !important; border: none !important;
+        border-radius: 12px !important; font-weight: 600 !important;
+        padding: 10px 0 !important;
+        transition: all 0.3s !important;
+    }
+    section[data-testid="stSidebar"] .stButton button:hover {
+        transform: translateY(-1px) !important;
+        box-shadow: 0 4px 20px rgba(99,102,241,0.4) !important;
     }
 </style>
+<div class="mesh-bg"></div>
 """, unsafe_allow_html=True)
 
-# --- Hero Header ---
+# --- Hero ---
 st.markdown("""
-<div class="hero">
-    <div class="hero-text">
-        <div class="hero-brand">NxtWave Intelligence</div>
-        <h1>AOL <em>Chatbot</em></h1>
-        <p class="hero-sub">NIAT 2025 &mdash; Program Design, Package &amp; Implementation</p>
+<div class="hero2">
+    <div class="hero2-left">
+        <div class="hero2-tag">NxtWave AOL</div>
+        <h1>Ask your <span>NIAT Data</span></h1>
+        <p class="hero2-sub">Instant answers from <strong>all sheets, subsheets &amp; linked documents</strong></p>
     </div>
-    <div class="hero-right">
-        <div class="live-pill"><span class="live-dot"></span> LIVE</div>
-        <span class="hero-version">v2.0 &middot; RAG-Powered</span>
+    <div class="hero2-right">
+        <div class="live2"><span class="live2-dot"></span> LIVE</div>
+        <div class="hero2-meta">v2.0 // RAG-powered</div>
     </div>
 </div>
 """, unsafe_allow_html=True)
 
-# --- Sidebar Top ---
+# --- Sidebar ---
 with st.sidebar:
     st.markdown("""
-    <div class="sb-logo">
-        <div class="sb-logo-icon">🎓</div>
+    <div class="sb2-brand">
+        <div class="sb2-icon">🎓</div>
         <div>
-            <div class="sb-logo-text">AOL Chatbot</div>
-            <div class="sb-logo-sub">NIAT 2025 Intelligence</div>
+            <div class="sb2-name">AOL Chatbot</div>
+            <div class="sb2-sub">NIAT Data Intelligence</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-    if st.button("🔄  Refresh Data", use_container_width=True):
+    if st.button("Refresh Data", use_container_width=True):
         st.cache_data.clear()
         if "retriever" in st.session_state:
             del st.session_state["retriever"]
         st.rerun()
 
-# --- Load Data ---
+# --- Load ---
 with st.status("Connecting to live data...", expanded=True) as status:
-    st.write("📡 Fetching from Google Sheets...")
+    st.write("Fetching from Google Sheets...")
     try:
         chunks, stats = load_everything()
     except Exception as e:
@@ -670,7 +707,7 @@ with st.status("Connecting to live data...", expanded=True) as status:
         st.info("Share the sheet (and linked sheets) with the service account email.")
         st.stop()
 
-    st.write("🔍 Building search index...")
+    st.write("Building search index...")
     if "retriever" not in st.session_state or st.session_state.get("chunk_count") != len(chunks):
         vectorizer, tfidf_matrix = build_retriever(chunks)
         st.session_state["retriever"] = (vectorizer, tfidf_matrix)
@@ -678,75 +715,51 @@ with st.status("Connecting to live data...", expanded=True) as status:
     else:
         vectorizer, tfidf_matrix = st.session_state["retriever"]
 
-    status.update(
-        label=f"All systems ready — {stats['total_chunks']} sections indexed",
-        state="complete",
-        expanded=False,
-    )
+    status.update(label=f"Ready — {stats['total_chunks']} sections indexed", state="complete", expanded=False)
 
-# --- Stat Cards ---
+# --- Stats ---
 main_chunks = [c for c in chunks if c["is_main"]]
 linked_chunks = [c for c in chunks if not c["is_main"]]
 total_chars = sum(len(c["text"]) for c in chunks)
 
 st.markdown(f"""
-<div class="stats-grid">
-    <div class="stat">
-        <div class="stat-icon">📋</div>
-        <div class="stat-num">{stats['main_tabs']}</div>
-        <div class="stat-label">Main Tabs</div>
-    </div>
-    <div class="stat">
-        <div class="stat-icon">🔗</div>
-        <div class="stat-num">{stats['linked_loaded']}</div>
-        <div class="stat-label">Linked Sheets</div>
-    </div>
-    <div class="stat">
-        <div class="stat-icon">🧠</div>
-        <div class="stat-num">{stats['total_chunks']}</div>
-        <div class="stat-label">Indexed Sections</div>
-    </div>
-    <div class="stat">
-        <div class="stat-icon">📊</div>
-        <div class="stat-num">{total_chars // 1000}K</div>
-        <div class="stat-label">Characters</div>
-    </div>
+<div class="sg">
+    <div class="sc"><div class="sc-icon">📋</div><div class="sc-num">{stats['main_tabs']}</div><div class="sc-label">Main Tabs</div></div>
+    <div class="sc"><div class="sc-icon">🔗</div><div class="sc-num">{stats['linked_loaded']}</div><div class="sc-label">Linked Sheets</div></div>
+    <div class="sc"><div class="sc-icon">🧠</div><div class="sc-num">{stats['total_chunks']}</div><div class="sc-label">Indexed</div></div>
+    <div class="sc"><div class="sc-icon">⚡</div><div class="sc-num">{total_chars // 1000}K</div><div class="sc-label">Characters</div></div>
 </div>
 """, unsafe_allow_html=True)
 
 # --- Sidebar Details ---
 with st.sidebar:
-    st.markdown("""
-    <div class="sb-status">✅ Online &mdash; All systems operational</div>
-    """, unsafe_allow_html=True)
+    st.markdown('<div class="sb2-status">✅ Online — All systems operational</div>', unsafe_allow_html=True)
 
     if stats["failed_links"]:
-        with st.expander(f"⚠️ {len(stats['failed_links'])} sheets inaccessible"):
+        with st.expander(f"⚠️ {len(stats['failed_links'])} inaccessible"):
             for fl in stats["failed_links"]:
                 st.caption(f"• {fl['label'][:40]} — {fl['error']}")
 
-    # Main sheets
-    st.markdown('<div class="sb-section">📋 Main Sheets</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sb2-section">Main Sheets</div>', unsafe_allow_html=True)
     main_html = ""
     for c in main_chunks:
         name = c["label"].split(">")[-1].strip() if ">" in c["label"] else c["label"]
-        main_html += f'<div class="sb-item">{name}</div>'
+        main_html += f'<div class="sb2-item">{name}</div>'
     st.markdown(main_html, unsafe_allow_html=True)
 
-    # Linked sheets
-    st.markdown(f'<div class="sb-section">🔗 Linked Sheets ({len(linked_chunks)})</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="sb2-section">Linked Sheets ({len(linked_chunks)})</div>', unsafe_allow_html=True)
     with st.expander("View all"):
-        linked_html = ""
+        lh = ""
         for c in linked_chunks:
             name = c["label"].split(">")[-1].strip() if ">" in c["label"] else c["label"]
-            linked_html += f'<div class="sb-item">{name[:50]}</div>'
-        st.markdown(linked_html, unsafe_allow_html=True)
+            lh += f'<div class="sb2-item">{name[:48]}</div>'
+        st.markdown(lh, unsafe_allow_html=True)
 
     st.markdown("---")
     st.markdown(
-        '<p style="font-size:0.7rem;color:#94a3b8;text-align:center;margin-top:8px;">'
-        'Cache: 5 min &middot; Click Refresh for latest<br>'
-        '<strong style="color:#6366f1;">Powered by NxtWave</strong></p>',
+        '<p style="font-size:0.65rem;color:#475569;text-align:center;">'
+        'Cache: 5 min<br>'
+        '<span style="background:linear-gradient(135deg,#6366f1,#ec4899);-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-weight:700;">Powered by NxtWave</span></p>',
         unsafe_allow_html=True,
     )
 
@@ -754,20 +767,21 @@ with st.sidebar:
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Welcome card (not a chat message — stands out more)
 if not st.session_state.messages:
     st.markdown("""
-    <div class="welcome-card">
-        <h3>👋 Welcome to AOL Chatbot</h3>
-        <p>I have access to all your NIAT 2025 data — BOS Trackers, Implementation details,
-        Curriculum sheets, Course data, Assessment Ops, and all linked university documents.</p>
-        <div class="example-chips">
-            <div class="chip">What is the BOS status for MRV?</div>
-            <div class="chip">Which universities have Full Delivery?</div>
-            <div class="chip">Show curriculum link for SGU</div>
-            <div class="chip">Who is the AOA for CDU 2025?</div>
-            <div class="chip">List all AICTE framework universities</div>
-            <div class="chip">Student count for Yenepoya</div>
+    <div class="wc">
+        <h3>👋 Hey! Ask me anything about NIAT</h3>
+        <p>I can search across all your sheets, linked documents, curricula, BOS trackers,
+        implementation plans, and more — instantly.</p>
+        <div class="wc-grid">
+            <div class="wc-chip">BOS status for MRV?</div>
+            <div class="wc-chip">Universities with Full Delivery</div>
+            <div class="wc-chip">Curriculum link for SGU</div>
+            <div class="wc-chip">AOA for CDU 2025</div>
+            <div class="wc-chip">AICTE framework universities</div>
+            <div class="wc-chip">Student count for Yenepoya</div>
+            <div class="wc-chip">Implementation wave details</div>
+            <div class="wc-chip">Prod sequence for BITS</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -777,7 +791,7 @@ for msg in st.session_state.messages:
     with st.chat_message(msg["role"], avatar=avatar):
         st.markdown(msg["content"])
 
-if prompt := st.chat_input("Ask anything about NIAT 2025 data..."):
+if prompt := st.chat_input("Ask anything about NIAT data..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user", avatar="👤"):
         st.markdown(prompt)
@@ -796,9 +810,9 @@ if prompt := st.chat_input("Ask anything about NIAT 2025 data..."):
 
         st.markdown(response)
 
-        with st.expander(f"📚 Sources ({len(relevant)} sections)"):
+        with st.expander(f"Sources ({len(relevant)})"):
             for r in relevant:
                 score = r.get("score", 0)
-                st.caption(f"• {r['label']} — relevance: {score:.2f}")
+                st.caption(f"• {r['label']} — {score:.2f}")
 
     st.session_state.messages.append({"role": "assistant", "content": response})
