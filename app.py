@@ -418,137 +418,55 @@ RELEVANT SPREADSHEET DATA:
 
 # --- UI ---
 
-st.set_page_config(page_title="AOL Chatbot", page_icon="🎓", layout="wide")
+st.set_page_config(
+    page_title="AOL Chatbot",
+    page_icon="🎓",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
 
+# Minimal CSS — let Streamlit's light theme do the heavy lifting
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-
-    /* Hide Streamlit chrome */
-    #MainMenu, footer, header {visibility: hidden;}
+    /* Only hide footer and deploy button, keep header for sidebar toggle */
+    footer {visibility: hidden;}
     .stDeployButton {display: none;}
 
-    /* Global */
-    html, body, [class*="css"] {
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-    }
-
-    /* Kill ALL green/colored left borders on alerts, containers, etc */
-    .stAlert > div {border-left: none !important;}
-    .stSuccess > div, .stWarning > div, .stError > div, .stInfo > div {
-        border-left: none !important;
-    }
-    div[data-testid="stNotification"] {border-left: none !important;}
-
-    /* Header */
+    /* Header banner */
     .aol-header {
         background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-        padding: 1.8rem 2.2rem;
-        border-radius: 16px;
-        margin-bottom: 1rem;
+        padding: 1.5rem 2rem;
+        border-radius: 14px;
+        margin-bottom: 1.2rem;
         display: flex;
         align-items: center;
         justify-content: space-between;
+        color: white;
     }
-    .aol-header h1 {
-        color: #f8fafc;
-        font-size: 1.5rem;
-        font-weight: 700;
-        margin: 0;
-        letter-spacing: 1px;
-    }
-    .aol-header p {
-        color: #94a3b8;
-        font-size: 0.82rem;
-        margin: 0.3rem 0 0 0;
-        font-weight: 400;
-    }
+    .aol-title { font-size: 1.4rem; font-weight: 700; margin: 0; letter-spacing: 0.5px; }
+    .aol-sub { color: #94a3b8; font-size: 0.82rem; margin: 4px 0 0 0; }
     .aol-live {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        background: rgba(34,197,94,0.15);
-        color: #4ade80;
-        padding: 0.35rem 1rem;
-        border-radius: 20px;
-        font-size: 0.75rem;
-        font-weight: 600;
-        letter-spacing: 0.5px;
+        display: inline-flex; align-items: center; gap: 6px;
+        background: rgba(34,197,94,0.15); color: #4ade80;
+        padding: 6px 14px; border-radius: 20px;
+        font-size: 0.75rem; font-weight: 600;
     }
-    .aol-live-dot {
-        width: 8px; height: 8px;
-        background: #4ade80;
-        border-radius: 50%;
-        display: inline-block;
-        animation: pulse 2s infinite;
+    .aol-dot {
+        width: 8px; height: 8px; background: #4ade80;
+        border-radius: 50%; display: inline-block;
+        animation: blink 2s infinite;
     }
-    @keyframes pulse {
-        0%, 100% {opacity: 1;}
-        50% {opacity: 0.4;}
-    }
+    @keyframes blink { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
 
-    /* Stat cards */
-    .stat-row {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 0.8rem;
-        margin-bottom: 1.5rem;
+    /* Stat cards row */
+    .stats { display: flex; gap: 12px; margin-bottom: 1.2rem; }
+    .scard {
+        flex: 1; text-align: center;
+        background: white; border: 1px solid #e2e8f0;
+        border-radius: 12px; padding: 16px 8px;
     }
-    .stat-card {
-        background: #ffffff;
-        border: 1px solid #e2e8f0;
-        border-radius: 12px;
-        padding: 1.1rem 1rem;
-        text-align: center;
-        transition: box-shadow 0.2s;
-    }
-    .stat-card:hover {
-        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-    }
-    .stat-card .num {
-        font-size: 1.6rem;
-        font-weight: 700;
-        color: #0f172a;
-        line-height: 1.2;
-    }
-    .stat-card .label {
-        font-size: 0.7rem;
-        color: #64748b;
-        text-transform: uppercase;
-        letter-spacing: 0.8px;
-        margin-top: 0.3rem;
-        font-weight: 500;
-    }
-
-    /* Chat area */
-    .stChatMessage {
-        border-radius: 12px !important;
-    }
-    [data-testid="stChatInput"] {
-        border-radius: 12px !important;
-    }
-
-    /* Sidebar */
-    section[data-testid="stSidebar"] {
-        background: #f8fafc;
-        border-right: 1px solid #e2e8f0;
-    }
-    section[data-testid="stSidebar"] h3 {
-        font-size: 0.7rem;
-        color: #94a3b8;
-        text-transform: uppercase;
-        letter-spacing: 1.2px;
-        font-weight: 600;
-        margin: 1.2rem 0 0.5rem 0;
-    }
-
-    /* Sidebar sheet list */
-    .sidebar-sheet {
-        font-size: 0.78rem;
-        color: #475569;
-        padding: 0.25rem 0;
-        border-bottom: 1px solid #f1f5f9;
-    }
+    .scard b { display: block; font-size: 1.5rem; color: #0f172a; }
+    .scard span { font-size: 0.68rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -556,24 +474,27 @@ st.markdown("""
 st.markdown("""
 <div class="aol-header">
     <div>
-        <h1>AOL - CHATBOT</h1>
-        <p>NIAT 2025 Program Design, Package &amp; Implementation Intelligence</p>
+        <div class="aol-title">AOL - CHATBOT</div>
+        <p class="aol-sub">NIAT 2025 &mdash; Program Design, Package &amp; Implementation Intelligence</p>
     </div>
-    <div class="aol-live"><span class="aol-live-dot"></span> LIVE</div>
+    <div class="aol-live"><span class="aol-dot"></span> LIVE</div>
 </div>
 """, unsafe_allow_html=True)
 
-# --- Sidebar Top ---
+# --- Sidebar ---
 with st.sidebar:
-    st.markdown("### Data Source")
-    if st.button("Refresh Data", type="primary", use_container_width=True):
+    st.markdown("#### 🎓 AOL Chatbot")
+    st.caption("NIAT 2025 Data Intelligence")
+    st.divider()
+    if st.button("🔄 Refresh Data", use_container_width=True):
         st.cache_data.clear()
         if "retriever" in st.session_state:
             del st.session_state["retriever"]
         st.rerun()
 
 # --- Load Data ---
-with st.spinner("Connecting to live data sources..."):
+with st.status("Loading live data...", expanded=True) as status:
+    st.write("Connecting to Google Sheets...")
     try:
         chunks, stats = load_everything()
     except Exception as e:
@@ -581,13 +502,19 @@ with st.spinner("Connecting to live data sources..."):
         st.info("Share the sheet (and linked sheets) with the service account email.")
         st.stop()
 
-if "retriever" not in st.session_state or st.session_state.get("chunk_count") != len(chunks):
-    with st.spinner("Indexing data for search..."):
+    st.write("Building search index...")
+    if "retriever" not in st.session_state or st.session_state.get("chunk_count") != len(chunks):
         vectorizer, tfidf_matrix = build_retriever(chunks)
         st.session_state["retriever"] = (vectorizer, tfidf_matrix)
         st.session_state["chunk_count"] = len(chunks)
-else:
-    vectorizer, tfidf_matrix = st.session_state["retriever"]
+    else:
+        vectorizer, tfidf_matrix = st.session_state["retriever"]
+
+    status.update(
+        label=f"Ready — {stats['total_chunks']} sections from {stats['main_tabs']} tabs + {stats['linked_loaded']} linked sheets",
+        state="complete",
+        expanded=False,
+    )
 
 # --- Stat Cards ---
 main_chunks = [c for c in chunks if c["is_main"]]
@@ -595,60 +522,47 @@ linked_chunks = [c for c in chunks if not c["is_main"]]
 total_chars = sum(len(c["text"]) for c in chunks)
 
 st.markdown(f"""
-<div class="stat-row">
-    <div class="stat-card">
-        <div class="num">{stats['main_tabs']}</div>
-        <div class="label">Main Tabs</div>
-    </div>
-    <div class="stat-card">
-        <div class="num">{stats['linked_loaded']}</div>
-        <div class="label">Linked Sheets</div>
-    </div>
-    <div class="stat-card">
-        <div class="num">{stats['total_chunks']}</div>
-        <div class="label">Indexed Sections</div>
-    </div>
-    <div class="stat-card">
-        <div class="num">{total_chars // 1000}K</div>
-        <div class="label">Characters</div>
-    </div>
+<div class="stats">
+    <div class="scard"><b>{stats['main_tabs']}</b><span>Main Tabs</span></div>
+    <div class="scard"><b>{stats['linked_loaded']}</b><span>Linked Sheets</span></div>
+    <div class="scard"><b>{stats['total_chunks']}</b><span>Indexed Sections</span></div>
+    <div class="scard"><b>{total_chars // 1000}K</b><span>Characters</span></div>
 </div>
 """, unsafe_allow_html=True)
 
 # --- Sidebar Details ---
 with st.sidebar:
-    st.markdown("### Status")
-    st.markdown(f"**{stats['total_chunks']}** sections indexed and searchable")
+    st.divider()
+
+    # Status
+    st.markdown(f"**Status:** ✅ Online — {stats['total_chunks']} sections")
 
     if stats["failed_links"]:
-        with st.expander(f"{len(stats['failed_links'])} sheets inaccessible"):
+        st.markdown(f"**⚠️ {len(stats['failed_links'])} sheets inaccessible**")
+        with st.expander("Show details"):
             for fl in stats["failed_links"]:
-                st.caption(f"{fl['label'][:40]} — {fl['error']}")
+                st.caption(f"• {fl['label'][:40]} — {fl['error']}")
 
-    st.markdown("### Main Sheets")
-    main_names = []
+    st.divider()
+
+    # Main sheets
+    st.markdown("**📋 Main Sheets**")
     for c in main_chunks:
         name = c["label"].split(">")[-1].strip() if ">" in c["label"] else c["label"]
-        main_names.append(name)
-    # Show as compact HTML list
-    main_html = "".join(f'<div class="sidebar-sheet">{n}</div>' for n in main_names)
-    st.markdown(main_html, unsafe_allow_html=True)
+        st.caption(f"• {name}")
 
-    st.markdown("### Linked Sheets")
-    with st.expander(f"View all ({len(linked_chunks)})"):
-        linked_html = ""
+    st.divider()
+
+    # Linked sheets
+    st.markdown(f"**🔗 Linked Sheets ({len(linked_chunks)})**")
+    with st.expander("View all"):
         for c in linked_chunks:
             name = c["label"].split(">")[-1].strip() if ">" in c["label"] else c["label"]
-            linked_html += f'<div class="sidebar-sheet">{name[:50]}</div>'
-        st.markdown(linked_html, unsafe_allow_html=True)
+            st.caption(f"• {name[:50]}")
 
-    st.markdown("---")
-    st.markdown(
-        '<p style="font-size:0.7rem;color:#94a3b8;text-align:center;">'
-        'Data cached 5 min &middot; Click Refresh for latest<br>'
-        'Powered by NxtWave AOL Intelligence</p>',
-        unsafe_allow_html=True,
-    )
+    st.divider()
+    st.caption("Data cached 5 min. Click Refresh for latest.")
+    st.caption("Powered by NxtWave AOL Intelligence")
 
 # --- Chat ---
 if "messages" not in st.session_state:
@@ -690,9 +604,9 @@ if prompt := st.chat_input("Ask about universities, BOS status, curricula, imple
 
         st.markdown(response)
 
-        with st.expander(f"Sources ({len(relevant)} sections)"):
+        with st.expander(f"📚 Sources ({len(relevant)} sections)"):
             for r in relevant:
                 score = r.get("score", 0)
-                st.caption(f"{r['label']} — {score:.2f}")
+                st.caption(f"• {r['label']} — relevance: {score:.2f}")
 
     st.session_state.messages.append({"role": "assistant", "content": response})
