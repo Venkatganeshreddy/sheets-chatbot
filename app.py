@@ -39,14 +39,16 @@ def get_sheet_id(url):
 
 
 def get_gc():
-    # Try Streamlit secrets for GCP credentials (cloud deployment)
-    try:
+    # Check if running on Streamlit Cloud (secrets available)
+    if "gcp_service_account" in st.secrets:
         gcp_info = dict(st.secrets["gcp_service_account"])
+        # Fix private key: TOML triple-quoted strings may lose \n formatting
+        pk = gcp_info.get("private_key", "")
+        if "\\n" in pk:
+            gcp_info["private_key"] = pk.replace("\\n", "\n")
         creds = Credentials.from_service_account_info(gcp_info, scopes=SCOPES)
         return gspread.authorize(creds)
-    except Exception:
-        pass
-    # Fall back to local credentials file
+    # Local dev: use credentials file
     credentials_path = os.getenv("GOOGLE_CREDENTIALS_PATH", "credentials.json")
     creds = Credentials.from_service_account_file(credentials_path, scopes=SCOPES)
     return gspread.authorize(creds)
