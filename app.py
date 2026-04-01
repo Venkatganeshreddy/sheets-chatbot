@@ -416,23 +416,129 @@ RELEVANT SPREADSHEET DATA:
     return data["choices"][0]["message"]["content"]
 
 
-# --- Streamlit UI ---
+# --- Custom CSS ---
 
-st.set_page_config(page_title="Sheets Chatbot", page_icon="📊", layout="wide")
+st.set_page_config(page_title="AOL Chatbot", page_icon="https://www.nxtwave.co.in/favicon.ico", layout="wide")
 
-st.title("📊 Google Sheets Chatbot")
-st.caption("Main sheet + all linked sheets via smart chips — smart retrieval")
+st.markdown("""
+<style>
+    /* Hide default Streamlit branding */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+
+    /* Global font */
+    html, body, [class*="css"] {
+        font-family: 'Inter', 'Segoe UI', sans-serif;
+    }
+
+    /* Top header bar */
+    .aol-header {
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+        padding: 1.5rem 2rem;
+        border-radius: 12px;
+        margin-bottom: 1.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    .aol-header h1 {
+        color: #ffffff;
+        font-size: 1.6rem;
+        font-weight: 700;
+        margin: 0;
+        letter-spacing: -0.5px;
+    }
+    .aol-header p {
+        color: #94a3b8;
+        font-size: 0.85rem;
+        margin: 0.25rem 0 0 0;
+    }
+    .aol-badge {
+        background: #22c55e;
+        color: white;
+        padding: 0.3rem 0.8rem;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    /* Stat cards */
+    .stat-row {
+        display: flex;
+        gap: 0.75rem;
+        margin-bottom: 1.5rem;
+    }
+    .stat-card {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 1rem 1.25rem;
+        flex: 1;
+        text-align: center;
+    }
+    .stat-card .num {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #1e293b;
+    }
+    .stat-card .label {
+        font-size: 0.75rem;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-top: 0.2rem;
+    }
+
+    /* Chat messages */
+    .stChatMessage {
+        border-radius: 12px !important;
+        margin-bottom: 0.5rem !important;
+    }
+
+    /* Sidebar styling */
+    [data-testid="stSidebar"] {
+        background: #f8fafc;
+    }
+    [data-testid="stSidebar"] .stMarkdown h2 {
+        font-size: 1rem;
+        color: #334155;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    /* Chat input */
+    .stChatInput {
+        border-radius: 12px !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# --- Header ---
+
+st.markdown("""
+<div class="aol-header">
+    <div>
+        <h1>AOL - CHATBOT</h1>
+        <p>NIAT 2025 Program Design, Package & Implementation Intelligence</p>
+    </div>
+    <div class="aol-badge">LIVE</div>
+</div>
+""", unsafe_allow_html=True)
+
+# --- Sidebar ---
 
 with st.sidebar:
-    st.header("Sheet Info")
-    if st.button("🔄 Refresh All Data"):
+    st.markdown("## Data Source")
+    if st.button("Refresh Data", type="primary", use_container_width=True):
         st.cache_data.clear()
         if "retriever" in st.session_state:
             del st.session_state["retriever"]
         st.rerun()
 
-# Load data
-with st.spinner("Fetching main sheet + all linked spreadsheets..."):
+# --- Load Data ---
+
+with st.spinner("Connecting to live data sources..."):
     try:
         chunks, stats = load_everything()
     except Exception as e:
@@ -442,70 +548,101 @@ with st.spinner("Fetching main sheet + all linked spreadsheets..."):
 
 # Build search index
 if "retriever" not in st.session_state or st.session_state.get("chunk_count") != len(chunks):
-    with st.spinner("Building search index..."):
+    with st.spinner("Indexing data for search..."):
         vectorizer, tfidf_matrix = build_retriever(chunks)
         st.session_state["retriever"] = (vectorizer, tfidf_matrix)
         st.session_state["chunk_count"] = len(chunks)
 else:
     vectorizer, tfidf_matrix = st.session_state["retriever"]
 
-# Sidebar stats
+# --- Stat Cards ---
+
+main_chunks = [c for c in chunks if c["is_main"]]
+linked_chunks = [c for c in chunks if not c["is_main"]]
+
+st.markdown(f"""
+<div class="stat-row">
+    <div class="stat-card">
+        <div class="num">{stats['main_tabs']}</div>
+        <div class="label">Main Tabs</div>
+    </div>
+    <div class="stat-card">
+        <div class="num">{stats['linked_loaded']}</div>
+        <div class="label">Linked Sheets</div>
+    </div>
+    <div class="stat-card">
+        <div class="num">{stats['total_chunks']}</div>
+        <div class="label">Searchable Sections</div>
+    </div>
+    <div class="stat-card">
+        <div class="num">{sum(len(c['text']) for c in chunks) // 1000}K</div>
+        <div class="label">Characters Indexed</div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+# --- Sidebar Details ---
+
 with st.sidebar:
-    st.success(f"Ready! {stats['total_chunks']} searchable sections")
-    st.metric("Main Sheet Tabs", stats["main_tabs"])
-    st.metric("Linked Sheets Found", stats["total_linked_found"])
-    st.metric("Linked Sheets Loaded", stats["linked_loaded"])
-    st.metric("Total Searchable Chunks", stats["total_chunks"])
+    st.markdown("## Status")
+    st.success(f"Online — {stats['total_chunks']} sections indexed")
 
     if stats["failed_links"]:
-        st.warning(f"{len(stats['failed_links'])} linked sheets failed")
-        with st.expander("Failed"):
+        st.warning(f"{len(stats['failed_links'])} sheets inaccessible")
+        with st.expander("Details"):
             for fl in stats["failed_links"]:
-                st.caption(f"- {fl['label'][:40]}: {fl['error']}")
+                st.caption(f"{fl['label'][:40]} — {fl['error']}")
 
-    st.divider()
-    # Show chunk list
-    main_chunks = [c for c in chunks if c["is_main"]]
-    linked_chunks = [c for c in chunks if not c["is_main"]]
+    st.markdown("## Main Sheets")
+    for c in main_chunks:
+        st.caption(f"{c['label']}")
 
-    with st.expander(f"Main tabs ({len(main_chunks)})"):
-        for c in main_chunks:
-            st.caption(f"- {c['label']}")
-
-    with st.expander(f"Linked sheet tabs ({len(linked_chunks)})"):
+    st.markdown("## Linked Sheets")
+    with st.expander(f"View all ({len(linked_chunks)})"):
         for c in linked_chunks:
-            st.caption(f"- {c['label'][:60]}")
+            st.caption(f"{c['label'][:55]}")
 
     st.divider()
-    st.caption("Cached 5 min. Uses smart retrieval to find relevant data per question.")
+    st.caption("Data cached 5 min. Click Refresh for latest.")
+    st.caption("Powered by NxtWave AOL Intelligence")
 
-# Chat
+# --- Chat Interface ---
+
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
+# Welcome message
+if not st.session_state.messages:
+    with st.chat_message("assistant", avatar="https://www.nxtwave.co.in/favicon.ico"):
+        st.markdown("""**Welcome to AOL Chatbot!** I have access to all your NIAT 2025 data including:
+
+- BOS Tracker (Sem 1-4) — university statuses, frameworks, accreditation
+- Implementation Tracker — delivery modes, timelines, waves
+- Curriculum sheets — all university-specific linked documents
+- Course data, assessment ops, platform references, and more
+
+**Ask me anything.** For example:
+- *"What is the BOS status for MRV University in Semester 1?"*
+- *"Which universities have Full Delivery mode?"*
+- *"Show me the curriculum link for SGU"*
+- *"Who is the AOA for CDU 2025?"*""")
+
 for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
+    avatar = "https://www.nxtwave.co.in/favicon.ico" if msg["role"] == "assistant" else None
+    with st.chat_message(msg["role"], avatar=avatar):
         st.markdown(msg["content"])
 
-if prompt := st.chat_input("Ask anything about your sheets..."):
+if prompt := st.chat_input("Ask about universities, BOS status, curricula, implementation..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    with st.chat_message("assistant"):
-        with st.spinner("Finding relevant data & generating answer..."):
-            # Retrieve relevant chunks
+    with st.chat_message("assistant", avatar="https://www.nxtwave.co.in/favicon.ico"):
+        with st.spinner("Searching across all sheets..."):
             relevant = retrieve_relevant_chunks(prompt, chunks, vectorizer, tfidf_matrix)
 
-            # Build context from relevant chunks
-            context_parts = []
-            for r in relevant:
-                context_parts.append(r["text"])
-
+            context_parts = [r["text"] for r in relevant]
             relevant_context = "\n\n---\n\n".join(context_parts)
-
-            # Show which sheets were used
-            sources = [r["label"] for r in relevant[:10]]
 
             api_messages = [
                 {"role": m["role"], "content": m["content"]}
@@ -515,10 +652,9 @@ if prompt := st.chat_input("Ask anything about your sheets..."):
 
         st.markdown(response)
 
-        # Show sources used
-        with st.expander(f"📚 Sources used ({len(relevant)} chunks)"):
+        with st.expander(f"Sources referenced ({len(relevant)} sections)"):
             for r in relevant:
                 score = r.get("score", 0)
-                st.caption(f"- {r['label']} (relevance: {score:.3f})")
+                st.caption(f"{r['label']} — relevance: {score:.2f}")
 
     st.session_state.messages.append({"role": "assistant", "content": response})
