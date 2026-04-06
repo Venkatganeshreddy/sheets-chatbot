@@ -531,7 +531,7 @@ DATA:
             "Content-Type": "application/json",
         },
         json={
-            "model": "google/gemini-2.5-flash-preview-04-17",
+            "model": "google/gemini-2.5-flash",
             "messages": api_messages,
             "max_tokens": 4096,
             "stream": True,
