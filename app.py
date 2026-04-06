@@ -31,7 +31,8 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive.readonly",
 ]
 
-MAX_CONTEXT_CHARS = 600_000
+MAX_CONTEXT_CHARS = 120_000  # Focused context — quality over quantity
+MAX_CHUNKS = 20  # Cap retrieved chunks so the LLM can focus
 ROWS_PER_CHUNK = 40  # Sub-chunk size for finer-grained retrieval
 
 
@@ -463,13 +464,13 @@ def retrieve_relevant_chunks(query, chunks, vectorizer, tfidf_matrix, max_chars=
 
     boosted_scores.sort(key=lambda x: x[1], reverse=True)
 
-    # Pure relevance-based selection — fill budget with top-scoring chunks
+    # Select top-scoring chunks (capped by count AND character budget)
     selected = []
     total_chars = 0
     selected_ids = set()
 
     for idx, score in boosted_scores:
-        if score <= 0:
+        if score <= 0 or len(selected) >= MAX_CHUNKS:
             break
         chunk = chunks[idx]
         if chunk["id"] in selected_ids:
@@ -486,29 +487,22 @@ def retrieve_relevant_chunks(query, chunks, vectorizer, tfidf_matrix, max_chars=
 
 def chat_with_openrouter(messages, relevant_context):
     system_msg = f"""You are a helpful assistant that answers questions based on live Google Sheets data.
-You have access to data from a MAIN spreadsheet and its LINKED spreadsheets (connected via smart chips).
-Below is the most relevant data for the user's question. Each row is formatted as column_name: value pairs.
+You have access to data from a MAIN spreadsheet and its LINKED spreadsheets.
+Each row is formatted as "ColumnName: value" pairs.
 
-RESPONSE FORMAT — STRICTLY FOLLOW:
-- Respond ONLY in plain text or Markdown. NEVER use HTML tags (no <div>, <span>, <table>, etc.).
-- Use Markdown tables (| col1 | col2 |) to display structured/tabular data.
-- Use **bold** for emphasis, bullet points for lists.
-- Keep answers concise and direct.
+FORMAT: Reply in plain text or Markdown only. Use Markdown tables for tabular data. NEVER output HTML.
 
-CRITICAL RULES:
-- Answer ONLY based on the data below. Do NOT guess or assume.
-- Be precise about matching: if the user asks about "CDU 2025", match EXACTLY "CDU 2025" — do NOT return data for "CDU 2024" or other years.
-- When the user asks about a specific semester (e.g., "sem-4", "semester 4", "Sem 4"), find rows where a semester/sem column contains that value.
-- When the user asks about "status" (e.g., "BOS status"), find columns whose name contains "status" or "BOS" and report their values for the matching rows.
-- When the user asks about "documents shared" or "links" or "document at the time of BOS", look for URL columns, link columns, or document-reference columns in the matching rows and return those URLs/names.
-- When multiple rows match partially, list ALL of them clearly, organized in a Markdown table.
-- Always cite the exact sheet/tab name AND row number.
-- Include full URLs when referencing links or documents — never omit or shorten them.
-- Cross-reference between main and linked sheets when relevant.
-- If the data below doesn't contain the answer, say so clearly and suggest what the user might search for instead.
-- Pay attention to column names — each row has "ColumnName: value" format. Use the column name to identify what each value means.
+RULES:
+1. Answer based ONLY on the data below.
+2. MATCHING: When the user asks about a university like "CDU 2024", search for rows where the university column contains "CDU". The year may or may not appear separately — match the university name flexibly. If a column like "Semester" or "Year" exists, use it to further filter.
+3. SEMESTERS: "sem-4", "semester 4", "Sem 4" all mean the same. Look for columns with "Sem 4", "Semester 4", or "Sem-4" in their header or value.
+4. STATUS QUESTIONS: When asked about "BOS status", look for columns containing "BOS" and "Status" in their name and report those values.
+5. DOCUMENT QUESTIONS: When asked about documents/links shared, look for URL columns, hyperlinks, or document-reference columns and return the full URLs.
+6. Always cite the sheet/tab name and row number.
+7. When multiple rows match, show ALL of them in a Markdown table.
+8. If truly nothing matches, say so and suggest alternative search terms.
 
-RELEVANT SPREADSHEET DATA:
+SPREADSHEET DATA:
 {relevant_context}"""
 
     api_messages = [{"role": "system", "content": system_msg}]
