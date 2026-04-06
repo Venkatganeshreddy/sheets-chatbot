@@ -489,13 +489,19 @@ def chat_with_openrouter(messages, relevant_context):
 You have access to data from a MAIN spreadsheet and its LINKED spreadsheets (connected via smart chips).
 Below is the most relevant data for the user's question. Each row is formatted as column_name: value pairs.
 
+RESPONSE FORMAT — STRICTLY FOLLOW:
+- Respond ONLY in plain text or Markdown. NEVER use HTML tags (no <div>, <span>, <table>, etc.).
+- Use Markdown tables (| col1 | col2 |) to display structured/tabular data.
+- Use **bold** for emphasis, bullet points for lists.
+- Keep answers concise and direct.
+
 CRITICAL RULES:
 - Answer ONLY based on the data below. Do NOT guess or assume.
 - Be precise about matching: if the user asks about "CDU 2025", match EXACTLY "CDU 2025" — do NOT return data for "CDU 2024" or other years.
 - When the user asks about a specific semester (e.g., "sem-4", "semester 4", "Sem 4"), find rows where a semester/sem column contains that value.
 - When the user asks about "status" (e.g., "BOS status"), find columns whose name contains "status" or "BOS" and report their values for the matching rows.
 - When the user asks about "documents shared" or "links" or "document at the time of BOS", look for URL columns, link columns, or document-reference columns in the matching rows and return those URLs/names.
-- When multiple rows match partially, list ALL of them clearly, organized in a table if helpful.
+- When multiple rows match partially, list ALL of them clearly, organized in a Markdown table.
 - Always cite the exact sheet/tab name AND row number.
 - Include full URLs when referencing links or documents — never omit or shorten them.
 - Cross-reference between main and linked sheets when relevant.
@@ -527,7 +533,10 @@ RELEVANT SPREADSHEET DATA:
 
     data = resp.json()
     try:
-        return data["choices"][0]["message"]["content"]
+        content = data["choices"][0]["message"]["content"]
+        # Strip any HTML tags the LLM might generate — we only want plain text/markdown
+        content = re.sub(r'<div[^>]*>|</div>|<span[^>]*>|</span>|<table[^>]*>|</table>|<tr[^>]*>|</tr>|<td[^>]*>|</td>|<th[^>]*>|</th>', '', content)
+        return content.strip()
     except (KeyError, IndexError, TypeError):
         return f"Unexpected API response: {json.dumps(data)[:500]}"
 
