@@ -32,6 +32,7 @@ SCOPES = [
 ]
 
 MAX_CONTEXT_CHARS = 600_000
+ROWS_PER_CHUNK = 40  # Sub-chunk size for finer-grained retrieval
 
 
 def get_sheet_id(url):
@@ -198,6 +199,97 @@ def format_tab_text(tab_name, info, source_label=""):
     return section
 
 
+def normalize_query(query):
+    """Normalize query for better TF-IDF matching."""
+    q = query
+    # Expand semester abbreviations: "sem-4" also matches "semester 4", "sem 4"
+    q = re.sub(
+        r'\bsem[-\s]?(\d+)\b',
+        lambda m: f'sem-{m.group(1)} semester {m.group(1)} sem {m.group(1)}',
+        q,
+        flags=re.IGNORECASE,
+    )
+    return q
+
+
+def create_tab_chunks(tab_name, info, source_label="", chunk_id_prefix=""):
+    """Split a tab into sub-chunks of ROWS_PER_CHUNK rows for finer retrieval."""
+    headers = info["headers"]
+    rows = info["rows"]
+    hyperlinks = info["hyperlinks"]
+    notes = info["notes"]
+
+    if not headers and not rows:
+        return []
+
+    total_rows = min(len(rows), 500)
+
+    # Small tabs: return as a single chunk
+    if total_rows <= ROWS_PER_CHUNK:
+        text = format_tab_text(tab_name, info, source_label)
+        if text.strip():
+            return [{"id": f"{chunk_id_prefix}/{tab_name}", "text": text}]
+        return []
+
+    prefix = f"[{source_label}] " if source_label else ""
+    header_line = f"Columns: {' | '.join(headers)}\n" if headers else ""
+
+    # Index hyperlinks and notes by data-row index (row 0 in row_data = header)
+    links_by_row = {}
+    for h in hyperlinks:
+        links_by_row.setdefault(h["row"], []).append(h)
+    notes_by_row = {}
+    for n in notes:
+        notes_by_row.setdefault(n["row"], []).append(n)
+
+    subchunks = []
+    for start in range(0, total_rows, ROWS_PER_CHUNK):
+        end = min(start + ROWS_PER_CHUNK, total_rows)
+        section = f"{prefix}Sheet: {tab_name} (Rows {start+1}-{end})\n{header_line}"
+
+        chunk_links = []
+        chunk_notes = []
+
+        for i in range(start, end):
+            row = rows[i]
+            if headers:
+                pairs = []
+                for j, cell in enumerate(row):
+                    if cell and cell.strip():
+                        col = headers[j] if j < len(headers) else f"Col{j}"
+                        pairs.append(f"{col}: {cell}")
+                if pairs:
+                    section += f"Row {i+1}: {' | '.join(pairs)}\n"
+            else:
+                row_str = " | ".join(cell for cell in row if cell)
+                if row_str.strip(" |"):
+                    section += f"Row {i+1}: {row_str}\n"
+
+            # row_data index: i+1 because header is row 0
+            ri = i + 1
+            if ri in links_by_row:
+                chunk_links.extend(links_by_row[ri])
+            if ri in notes_by_row:
+                chunk_notes.extend(notes_by_row[ri])
+
+        if chunk_links:
+            section += "Links:\n"
+            for h in chunk_links:
+                lt = f" [{h.get('type', '')}]" if h.get("type") else ""
+                section += f'  {h["col"]} "{h["text"][:60]}" -> {h["url"]}{lt}\n'
+
+        if chunk_notes:
+            section += "Notes:\n"
+            for n in chunk_notes:
+                section += f'  {n["col"]} "{n["text"]}": {n["note"]}\n'
+
+        if section.strip():
+            chunk_id = f"{chunk_id_prefix}/{tab_name}/rows_{start+1}_{end}"
+            subchunks.append({"id": chunk_id, "text": section})
+
+    return subchunks
+
+
 @st.cache_data(ttl=300)
 def load_everything():
     """Load main sheet + linked sheets. Returns list of (chunk_id, chunk_text) for retrieval."""
@@ -208,15 +300,16 @@ def load_everything():
     main_content = fetch_spreadsheet_full(gc, sheet_id)
     main_title, main_data, chip_links = parse_spreadsheet(main_content, is_linked=False)
 
-    # Build chunks: each tab = one chunk
+    # Build sub-chunks: each tab split into ~ROWS_PER_CHUNK-row pieces
     chunks = []
     for tab_name, info in main_data.items():
-        text = format_tab_text(tab_name, info, source_label=f"MAIN: {main_title}")
-        if text.strip():
+        tab_chunks = create_tab_chunks(
+            tab_name, info, source_label=f"MAIN: {main_title}", chunk_id_prefix="main"
+        )
+        for tc in tab_chunks:
             chunks.append({
-                "id": f"main/{tab_name}",
+                **tc,
                 "label": f"{main_title} > {tab_name}",
-                "text": text,
                 "is_main": True,
             })
 
@@ -243,12 +336,15 @@ def load_everything():
             linked_loaded += 1
 
             for tab_name, info in linked_tabs.items():
-                text = format_tab_text(tab_name, info, source_label=f"LINKED: {linked_title}")
-                if text.strip():
+                tab_chunks = create_tab_chunks(
+                    tab_name, info,
+                    source_label=f"LINKED: {linked_title}",
+                    chunk_id_prefix=f"linked/{cl['sheet_id']}",
+                )
+                for tc in tab_chunks:
                     chunks.append({
-                        "id": f"linked/{cl['sheet_id']}/{tab_name}",
+                        **tc,
                         "label": f"{linked_title} > {tab_name}",
-                        "text": text,
                         "is_main": False,
                         "url": cl["url"],
                     })
@@ -261,12 +357,15 @@ def load_everything():
                     linked_title, linked_tabs, _ = parse_spreadsheet(linked_content, is_linked=True)
                     linked_loaded += 1
                     for tab_name, info in linked_tabs.items():
-                        text = format_tab_text(tab_name, info, source_label=f"LINKED: {linked_title}")
-                        if text.strip():
+                        tab_chunks = create_tab_chunks(
+                            tab_name, info,
+                            source_label=f"LINKED: {linked_title}",
+                            chunk_id_prefix=f"linked/{cl['sheet_id']}",
+                        )
+                        for tc in tab_chunks:
                             chunks.append({
-                                "id": f"linked/{cl['sheet_id']}/{tab_name}",
+                                **tc,
                                 "label": f"{linked_title} > {tab_name}",
-                                "text": text,
                                 "is_main": False,
                                 "url": cl["url"],
                             })
@@ -308,13 +407,14 @@ def build_retriever(chunks):
 
 
 def retrieve_relevant_chunks(query, chunks, vectorizer, tfidf_matrix, max_chars=MAX_CONTEXT_CHARS):
-    """Find the most relevant chunks for a query using TF-IDF + keyword matching."""
-    query_vec = vectorizer.transform([query])
+    """Find the most relevant chunks using TF-IDF + keyword + column-header matching."""
+    # Normalize the query for better TF-IDF matching
+    normalized = normalize_query(query)
+    query_vec = vectorizer.transform([normalized])
     scores = cosine_similarity(query_vec, tfidf_matrix).flatten()
 
     query_lower = query.lower()
     query_words = set(re.findall(r'\w+', query_lower))
-    # Filter out very short/common words for matching
     meaningful_words = {w for w in query_words if len(w) > 2}
 
     boosted_scores = []
@@ -326,47 +426,41 @@ def retrieve_relevant_chunks(query, chunks, vectorizer, tfidf_matrix, max_chars=
         if query_lower in chunk_lower:
             score += 0.8
 
-        # Boost for keyword matches (proportional to how many match)
+        # Boost for keyword overlap (proportional)
         keyword_hits = sum(1 for w in meaningful_words if w in chunk_lower)
         if meaningful_words:
             score += (keyword_hits / len(meaningful_words)) * 0.4
 
+        # Column header match — boost chunks whose columns match query terms
+        col_match = re.search(r'Columns: (.+)', chunk["text"])
+        if col_match:
+            cols_lower = col_match.group(1).lower()
+            col_hits = sum(1 for w in meaningful_words if w in cols_lower)
+            if meaningful_words:
+                score += (col_hits / len(meaningful_words)) * 0.3
+
+        # Small tie-breaker for main sheets
+        if chunk.get("is_main"):
+            score += 0.05
+
         boosted_scores.append((i, score))
 
-    # Sort by score descending
     boosted_scores.sort(key=lambda x: x[1], reverse=True)
 
-    # Step 1: Always include ALL main sheet tabs first (they're the core data)
+    # Pure relevance-based selection — fill budget with top-scoring chunks
     selected = []
     total_chars = 0
-    main_budget = int(max_chars * 0.5)  # Reserve 50% for main sheets
-
-    # Add main tabs sorted by relevance
-    main_indices = [(idx, sc) for idx, sc in boosted_scores if chunks[idx]["is_main"]]
-    for idx, score in main_indices:
-        chunk = chunks[idx]
-        chunk_len = len(chunk["text"])
-        if total_chars + chunk_len > main_budget:
-            continue
-        selected.append({**chunk, "score": score})
-        total_chars += chunk_len
-
-    # Step 2: Fill remaining budget with top linked chunks
-    linked_budget = max_chars - total_chars
-    selected_ids = {s["id"] for s in selected}
+    selected_ids = set()
 
     for idx, score in boosted_scores:
+        if score <= 0:
+            break
         chunk = chunks[idx]
         if chunk["id"] in selected_ids:
             continue
         chunk_len = len(chunk["text"])
         if total_chars + chunk_len > max_chars:
-            if not chunk["is_main"] and total_chars > main_budget:
-                continue
-            # Truncate if it's the first linked chunk and it's huge
-            if chunk_len > linked_budget:
-                selected.append({**chunk, "text": chunk["text"][:linked_budget], "score": score})
-                break
+            continue
         selected.append({**chunk, "score": score})
         total_chars += chunk_len
         selected_ids.add(chunk["id"])
@@ -382,11 +476,14 @@ Below is the most relevant data for the user's question. Each row is formatted a
 CRITICAL RULES:
 - Answer ONLY based on the data below. Do NOT guess or assume.
 - Be precise about matching: if the user asks about "CDU 2025", match EXACTLY "CDU 2025" — do NOT return data for "CDU 2024" or other years.
-- When multiple rows match partially, list ALL of them and highlight the differences.
+- When the user asks about a specific semester (e.g., "sem-4", "semester 4", "Sem 4"), find rows where a semester/sem column contains that value.
+- When the user asks about "status" (e.g., "BOS status"), find columns whose name contains "status" or "BOS" and report their values for the matching rows.
+- When the user asks about "documents shared" or "links" or "document at the time of BOS", look for URL columns, link columns, or document-reference columns in the matching rows and return those URLs/names.
+- When multiple rows match partially, list ALL of them clearly, organized in a table if helpful.
 - Always cite the exact sheet/tab name AND row number.
-- Include full URLs when referencing links.
+- Include full URLs when referencing links or documents — never omit or shorten them.
 - Cross-reference between main and linked sheets when relevant.
-- If the data below doesn't contain the answer, say so and suggest what sheet might have it.
+- If the data below doesn't contain the answer, say so clearly and suggest what the user might search for instead.
 - Pay attention to column names — each row has "ColumnName: value" format. Use the column name to identify what each value means.
 
 RELEVANT SPREADSHEET DATA:
@@ -774,14 +871,14 @@ if not st.session_state.messages:
         <p>I can search across all your sheets, linked documents, curricula, BOS trackers,
         implementation plans, and more — instantly.</p>
         <div class="wc-grid">
+            <div class="wc-chip">BOS status of CDU 2024 sem-4?</div>
+            <div class="wc-chip">Document shared at time of BOS?</div>
             <div class="wc-chip">BOS status for MRV?</div>
             <div class="wc-chip">Universities with Full Delivery</div>
             <div class="wc-chip">Curriculum link for SGU</div>
             <div class="wc-chip">AOA for CDU 2025</div>
-            <div class="wc-chip">AICTE framework universities</div>
             <div class="wc-chip">Student count for Yenepoya</div>
             <div class="wc-chip">Implementation wave details</div>
-            <div class="wc-chip">Prod sequence for BITS</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
