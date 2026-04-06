@@ -100,7 +100,7 @@ def parse_spreadsheet(content, is_linked=False):
         all_rows = []
         for row in row_data:
             cells = row.get("values", [])
-            all_rows.append([c.get("formattedValue", "") for c in cells])
+            all_rows.append([c.get("formattedValue") or "" for c in cells])
 
         headers = all_rows[0] if all_rows else []
         data_rows = all_rows[1:] if len(all_rows) > 1 else []
@@ -113,7 +113,7 @@ def parse_spreadsheet(content, is_linked=False):
 
         for ri, row in enumerate(row_data):
             for ci, cell in enumerate(row.get("values", [])):
-                text = cell.get("formattedValue", "")
+                text = cell.get("formattedValue") or ""
                 cn = col_name(ci)
 
                 link = cell.get("hyperlink")
@@ -175,13 +175,13 @@ def format_tab_text(tab_name, info, source_label=""):
         if headers:
             pairs = []
             for j, cell in enumerate(row):
-                if cell.strip():
+                if cell and cell.strip():
                     col = headers[j] if j < len(headers) else f"Col{j}"
                     pairs.append(f"{col}: {cell}")
             if pairs:
                 section += f"Row {i+1}: {' | '.join(pairs)}\n"
         else:
-            row_str = " | ".join(cell for cell in row)
+            row_str = " | ".join(cell or "" for cell in row)
             if row_str.strip(" |"):
                 section += f"Row {i+1}: {row_str}\n"
 
@@ -189,12 +189,14 @@ def format_tab_text(tab_name, info, source_label=""):
         section += "Links:\n"
         for h in hyperlinks:
             lt = f" [{h.get('type', '')}]" if h.get("type") else ""
-            section += f'  {h["col"]} "{h["text"][:60]}" -> {h["url"]}{lt}\n'
+            txt = (h.get("text") or "")[:60]
+            section += f'  {h["col"]} "{txt}" -> {h["url"]}{lt}\n'
 
     if notes:
         section += "Notes:\n"
         for n in notes:
-            section += f'  {n["col"]} "{n["text"]}": {n["note"]}\n'
+            txt = n.get("text") or ""
+            section += f'  {n["col"]} "{txt}": {n["note"]}\n'
 
     return section
 
@@ -250,6 +252,13 @@ def create_tab_chunks(tab_name, info, source_label="", chunk_id_prefix=""):
         chunk_links = []
         chunk_notes = []
 
+        # Include header-row (ri=0) hyperlinks/notes in the first sub-chunk
+        if start == 0:
+            if 0 in links_by_row:
+                chunk_links.extend(links_by_row[0])
+            if 0 in notes_by_row:
+                chunk_notes.extend(notes_by_row[0])
+
         for i in range(start, end):
             row = rows[i]
             if headers:
@@ -276,12 +285,14 @@ def create_tab_chunks(tab_name, info, source_label="", chunk_id_prefix=""):
             section += "Links:\n"
             for h in chunk_links:
                 lt = f" [{h.get('type', '')}]" if h.get("type") else ""
-                section += f'  {h["col"]} "{h["text"][:60]}" -> {h["url"]}{lt}\n'
+                txt = (h.get("text") or "")[:60]
+                section += f'  {h["col"]} "{txt}" -> {h["url"]}{lt}\n'
 
         if chunk_notes:
             section += "Notes:\n"
             for n in chunk_notes:
-                section += f'  {n["col"]} "{n["text"]}": {n["note"]}\n'
+                txt = n.get("text") or ""
+                section += f'  {n["col"]} "{txt}": {n["note"]}\n'
 
         if section.strip():
             chunk_id = f"{chunk_id_prefix}/{tab_name}/rows_{start+1}_{end}"
@@ -323,7 +334,7 @@ def load_everything():
 
     linked_loaded = 0
     failed_links = []
-    progress = st.progress(0, text="Loading linked sheets...")
+    progress = st.progress(0, text="Loading linked sheets...") if unique_links else None
 
     for i, cl in enumerate(unique_links):
         progress.progress(
@@ -379,7 +390,8 @@ def load_everything():
         if i < len(unique_links) - 1:
             time.sleep(1.5)
 
-    progress.empty()
+    if progress:
+        progress.empty()
 
     stats = {
         "main_title": main_title,
@@ -395,6 +407,8 @@ def load_everything():
 
 def build_retriever(chunks):
     """Build TF-IDF index over all chunks for fast retrieval."""
+    if not chunks:
+        return None, None
     texts = [c["text"] for c in chunks]
     vectorizer = TfidfVectorizer(
         stop_words="english",
@@ -408,6 +422,8 @@ def build_retriever(chunks):
 
 def retrieve_relevant_chunks(query, chunks, vectorizer, tfidf_matrix, max_chars=MAX_CONTEXT_CHARS):
     """Find the most relevant chunks using TF-IDF + keyword + column-header matching."""
+    if not chunks or vectorizer is None or tfidf_matrix is None:
+        return []
     # Normalize the query for better TF-IDF matching
     normalized = normalize_query(query)
     query_vec = vectorizer.transform([normalized])
@@ -510,7 +526,10 @@ RELEVANT SPREADSHEET DATA:
         return f"API Error ({resp.status_code}): {resp.text}"
 
     data = resp.json()
-    return data["choices"][0]["message"]["content"]
+    try:
+        return data["choices"][0]["message"]["content"]
+    except (KeyError, IndexError, TypeError):
+        return f"Unexpected API response: {json.dumps(data)[:500]}"
 
 
 # --- UI ---
@@ -805,10 +824,12 @@ with st.status("Connecting to live data...", expanded=True) as status:
         st.stop()
 
     st.write("Building search index...")
-    if "retriever" not in st.session_state or st.session_state.get("chunk_count") != len(chunks):
+    # Use a hash of chunk IDs to detect data changes (not just count)
+    chunk_fingerprint = hash(tuple(c["id"] for c in chunks)) if chunks else 0
+    if "retriever" not in st.session_state or st.session_state.get("chunk_fp") != chunk_fingerprint:
         vectorizer, tfidf_matrix = build_retriever(chunks)
         st.session_state["retriever"] = (vectorizer, tfidf_matrix)
-        st.session_state["chunk_count"] = len(chunks)
+        st.session_state["chunk_fp"] = chunk_fingerprint
     else:
         vectorizer, tfidf_matrix = st.session_state["retriever"]
 
@@ -839,16 +860,23 @@ with st.sidebar:
 
     st.markdown('<div class="sb2-section">Main Sheets</div>', unsafe_allow_html=True)
     main_html = ""
+    seen_main_names = set()
     for c in main_chunks:
         name = c["label"].split(">")[-1].strip() if ">" in c["label"] else c["label"]
-        main_html += f'<div class="sb2-item">{name}</div>'
+        if name not in seen_main_names:
+            seen_main_names.add(name)
+            main_html += f'<div class="sb2-item">{name}</div>'
     st.markdown(main_html, unsafe_allow_html=True)
 
-    st.markdown(f'<div class="sb2-section">Linked Sheets ({len(linked_chunks)})</div>', unsafe_allow_html=True)
+    # Count unique linked sheet names (not sub-chunks)
+    seen_linked_names = set()
+    for c in linked_chunks:
+        name = c["label"].split(">")[-1].strip() if ">" in c["label"] else c["label"]
+        seen_linked_names.add(name)
+    st.markdown(f'<div class="sb2-section">Linked Sheets ({len(seen_linked_names)})</div>', unsafe_allow_html=True)
     with st.expander("View all"):
         lh = ""
-        for c in linked_chunks:
-            name = c["label"].split(">")[-1].strip() if ">" in c["label"] else c["label"]
+        for name in sorted(seen_linked_names):
             lh += f'<div class="sb2-item">{name[:48]}</div>'
         st.markdown(lh, unsafe_allow_html=True)
 
@@ -899,9 +927,11 @@ if prompt := st.chat_input("Ask anything about NIAT data..."):
             context_parts = [r["text"] for r in relevant]
             relevant_context = "\n\n---\n\n".join(context_parts)
 
+            # Limit conversation history to last 20 messages to avoid exceeding model context
+            recent_messages = st.session_state.messages[-20:]
             api_messages = [
                 {"role": m["role"], "content": m["content"]}
-                for m in st.session_state.messages
+                for m in recent_messages
             ]
             response = chat_with_openrouter(api_messages, relevant_context)
 
