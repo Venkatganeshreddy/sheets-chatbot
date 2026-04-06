@@ -26,13 +26,19 @@ def get_secret(key, default=None):
 OPENROUTER_API_KEY = get_secret("OPENROUTER_API_KEY")
 SHEET_URL = get_secret("SHEET_URL")
 
+def _validate_config():
+    if not OPENROUTER_API_KEY or not SHEET_URL:
+        st.error("Missing required secrets: OPENROUTER_API_KEY and/or SHEET_URL. "
+                 "Set them in Streamlit Cloud Secrets or a local .env file.")
+        st.stop()
+
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets.readonly",
     "https://www.googleapis.com/auth/drive.readonly",
 ]
 
-MAX_CONTEXT_CHARS = 120_000  # Focused context — quality over quantity
-MAX_CHUNKS = 20  # Cap retrieved chunks so the LLM can focus
+MAX_CONTEXT_CHARS = 100_000  # Focused context — quality over quantity
+MAX_CHUNKS = 15  # Cap retrieved chunks so the LLM can focus
 ROWS_PER_CHUNK = 40  # Sub-chunk size for finer-grained retrieval
 
 
@@ -431,8 +437,11 @@ def retrieve_relevant_chunks(query, chunks, vectorizer, tfidf_matrix, max_chars=
     scores = cosine_similarity(query_vec, tfidf_matrix).flatten()
 
     query_lower = query.lower()
+    normalized_lower = normalized.lower()
     query_words = set(re.findall(r'\w+', query_lower))
-    meaningful_words = {w for w in query_words if len(w) > 2}
+    normalized_words = set(re.findall(r'\w+', normalized_lower))
+    # Combine original + normalized words for matching
+    meaningful_words = {w for w in (query_words | normalized_words) if len(w) > 2}
 
     boosted_scores = []
     for i, chunk in enumerate(chunks):
@@ -455,6 +464,12 @@ def retrieve_relevant_chunks(query, chunks, vectorizer, tfidf_matrix, max_chars=
             col_hits = sum(1 for w in meaningful_words if w in cols_lower)
             if meaningful_words:
                 score += (col_hits / len(meaningful_words)) * 0.3
+
+        # Sheet/tab name match — strongest signal! "BOS Tracker [Sem 3 & Sem 4]" for "BOS sem-4"
+        label_lower = chunk.get("label", "").lower()
+        label_hits = sum(1 for w in meaningful_words if w in label_lower)
+        if meaningful_words:
+            score += (label_hits / len(meaningful_words)) * 0.6
 
         # Small tie-breaker for main sheets
         if chunk.get("is_main"):
@@ -486,23 +501,24 @@ def retrieve_relevant_chunks(query, chunks, vectorizer, tfidf_matrix, max_chars=
 
 
 def chat_with_openrouter(messages, relevant_context):
-    system_msg = f"""You are a helpful assistant that answers questions based on live Google Sheets data.
-You have access to data from a MAIN spreadsheet and its LINKED spreadsheets.
-Each row is formatted as "ColumnName: value" pairs.
+    system_msg = f"""You are a data lookup assistant. You answer questions by finding matching rows in the spreadsheet data below.
 
-FORMAT: Reply in plain text or Markdown only. Use Markdown tables for tabular data. NEVER output HTML.
+FORMAT: Markdown only. Use Markdown tables for results. NEVER output HTML tags.
 
-RULES:
-1. Answer based ONLY on the data below.
-2. MATCHING: When the user asks about a university like "CDU 2024", search for rows where the university column contains "CDU". The year may or may not appear separately — match the university name flexibly. If a column like "Semester" or "Year" exists, use it to further filter.
-3. SEMESTERS: "sem-4", "semester 4", "Sem 4" all mean the same. Look for columns with "Sem 4", "Semester 4", or "Sem-4" in their header or value.
-4. STATUS QUESTIONS: When asked about "BOS status", look for columns containing "BOS" and "Status" in their name and report those values.
-5. DOCUMENT QUESTIONS: When asked about documents/links shared, look for URL columns, hyperlinks, or document-reference columns and return the full URLs.
-6. Always cite the sheet/tab name and row number.
-7. When multiple rows match, show ALL of them in a Markdown table.
-8. If truly nothing matches, say so and suggest alternative search terms.
+HOW TO MATCH:
+- University names: "CDU 2024" means find rows where university = "CDU". The year might not be in the same column.
+- Semesters: "sem-4" = "Sem 4" = "Semester 4". Check BOTH column headers and cell values.
+- "BOS status" means find columns with "BOS" and/or "Status" in the header name.
+- "document shared" means find URL/link/document columns in matching rows.
 
-SPREADSHEET DATA:
+IMPORTANT:
+- If you find ANY matching data, present it immediately. Do NOT say "data not found" if you can see relevant rows.
+- Cite sheet name and row number for every result.
+- Include full URLs when they exist.
+- Show results in a Markdown table when there are multiple matches.
+- Only say "not found" if you truly cannot find ANY relevant rows after checking all the data.
+
+DATA:
 {relevant_context}"""
 
     api_messages = [{"role": "system", "content": system_msg}]
@@ -515,24 +531,42 @@ SPREADSHEET DATA:
             "Content-Type": "application/json",
         },
         json={
-            "model": "google/gemini-2.0-flash-001",
+            "model": "google/gemini-2.5-flash-preview-04-17",
             "messages": api_messages,
             "max_tokens": 4096,
+            "stream": True,
         },
         timeout=120,
+        stream=True,
     )
 
     if resp.status_code != 200:
         return f"API Error ({resp.status_code}): {resp.text}"
 
-    data = resp.json()
-    try:
-        content = data["choices"][0]["message"]["content"]
-        # Strip any HTML tags the LLM might generate — we only want plain text/markdown
-        content = re.sub(r'<div[^>]*>|</div>|<span[^>]*>|</span>|<table[^>]*>|</table>|<tr[^>]*>|</tr>|<td[^>]*>|</td>|<th[^>]*>|</th>', '', content)
-        return content.strip()
-    except (KeyError, IndexError, TypeError):
-        return f"Unexpected API response: {json.dumps(data)[:500]}"
+    return resp  # Return the stream response for the UI to consume
+
+
+def _clean_html(text):
+    """Strip HTML tags from LLM output."""
+    return re.sub(r'<div[^>]*>|</div>|<span[^>]*>|</span>|<table[^>]*>|</table>|<tr[^>]*>|</tr>|<td[^>]*>|</td>|<th[^>]*>|</th>', '', text)
+
+
+def stream_response(resp):
+    """Generator that yields tokens from an OpenRouter streaming response."""
+    for line in resp.iter_lines(decode_unicode=True):
+        if not line or not line.startswith("data: "):
+            continue
+        payload = line[6:]  # Strip "data: " prefix
+        if payload.strip() == "[DONE]":
+            break
+        try:
+            chunk = json.loads(payload)
+            delta = chunk.get("choices", [{}])[0].get("delta", {})
+            token = delta.get("content", "")
+            if token:
+                yield _clean_html(token)
+        except (json.JSONDecodeError, IndexError, KeyError):
+            continue
 
 
 # --- UI ---
@@ -543,6 +577,7 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+_validate_config()
 
 st.markdown("""
 <style>
@@ -814,6 +849,8 @@ with st.sidebar:
         st.cache_data.clear()
         if "retriever" in st.session_state:
             del st.session_state["retriever"]
+        # Clear chat history so old (possibly wrong) answers don't persist
+        st.session_state.messages = []
         st.rerun()
 
 # --- Load ---
@@ -930,15 +967,21 @@ if prompt := st.chat_input("Ask anything about NIAT data..."):
             context_parts = [r["text"] for r in relevant]
             relevant_context = "\n\n---\n\n".join(context_parts)
 
-            # Limit conversation history to last 20 messages to avoid exceeding model context
+            # Limit conversation history to last 20 messages
             recent_messages = st.session_state.messages[-20:]
             api_messages = [
                 {"role": m["role"], "content": m["content"]}
                 for m in recent_messages
             ]
-            response = chat_with_openrouter(api_messages, relevant_context)
+            resp = chat_with_openrouter(api_messages, relevant_context)
 
-        st.markdown(response)
+        # Stream the response token by token
+        if isinstance(resp, str):
+            # Non-streaming error response
+            response = resp
+            st.markdown(response)
+        else:
+            response = st.write_stream(stream_response(resp))
 
         with st.expander(f"Sources ({len(relevant)})"):
             for r in relevant:
